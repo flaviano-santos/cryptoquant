@@ -1,0 +1,29 @@
+name: Publish audited source
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Expand audited source bundle
+        shell: bash
+        run: |
+          if [ ! -f cryptoquant-clean-source.zip ]; then
+            echo "Waiting for audited source bundle."
+            exit 0
+          fi
+          unzip -o cryptoquant-clean-source.zip || [ "$?" -eq 1 ]
+          rm cryptoquant-clean-source.zip
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: publish audited cryptoquant platform"
+          git push
