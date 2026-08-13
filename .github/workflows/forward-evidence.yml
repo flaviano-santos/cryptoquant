@@ -1,0 +1,53 @@
+name: Forward evidence
+
+on:
+  schedule:
+    # GitHub schedules use UTC. Avoid the start of the hour, when delays peak.
+    - cron: "37 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: forward-evidence
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install research package
+        run: pip install -e .
+
+      - name: Verify frozen evidence before collection
+        run: python -m cryptoquant.forward verify --config config.yaml --directory forward_evidence
+
+      - name: Download completed bars and append evidence
+        run: python -m cryptoquant.forward update --config config.yaml --directory forward_evidence | tee forward_snapshot.json
+
+      - name: Verify evidence after collection
+        run: python -m cryptoquant.forward verify --config config.yaml --directory forward_evidence
+
+      - name: Commit ledger update only
+        shell: bash
+        run: |
+          if git diff --quiet -- forward_evidence/ledger.jsonl; then
+            echo "No newly completed Binance archive was available."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- forward_evidence/ledger.jsonl
+          git commit -m "data: append frozen forward evidence"
+          git push
