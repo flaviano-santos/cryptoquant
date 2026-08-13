@@ -1,0 +1,46 @@
+# ---------------------------------------------------------------------------
+# cryptoquant configuration
+#
+# Copy this file, edit it, and pass it with --config, or leave it at the repo
+# root where it is discovered automatically. Never put API keys here: they are
+# read from the CQ_API_KEY and CQ_API_SECRET environment variables.
+# ---------------------------------------------------------------------------
+
+data:
+  root: ./data                    # parquet lake + duckdb file live here
+  market: futures_um              # 'spot' or 'futures_um' (USD-M perpetuals)
+  symbols: [BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, XRPUSDT]
+  interval: 1h                    # 1m 5m 15m 1h 4h 1d
+  start: "2020-01-01"
+  end: null                       # null = up to last completed month
+
+costs:
+  # Binance USD-M futures VIP0, no BNB discount. CHECK YOUR OWN TIER.
+  taker_fee_bps: 4.5              # 0.045%
+  maker_fee_bps: 2.0              # 0.020%
+  # Slippage: half-spread + market impact. Deliberately pessimistic.
+  slippage_bps: 2.0
+  # Perp funding is charged every 8h on notional. Real historical rates are
+  # used when available; this is only the fallback.
+  fallback_funding_bps_8h: 1.0
+
+risk:
+  target_annual_vol: 0.20         # portfolio vol target
+  max_gross_leverage: 2.0
+  max_position_per_asset: 0.5     # fraction of equity, absolute
+  vol_lookback: 72                # bars for realised vol estimate
+  kelly_fraction: 0.25            # never run full Kelly
+  max_daily_loss: 0.03            # kill switch: 3% of equity in one day
+  max_drawdown: 0.20              # kill switch: 20% peak-to-trough
+
+backtest:
+  initial_equity: 10000
+  bars_per_year: 8760             # 24*365 for hourly data
+
+live:
+  exchange: binanceusdm
+  testnet: true                   # KEEP TRUE until you have run months of paper
+  dry_run: true                   # true = log intended orders, send nothing
+  poll_seconds: 60
+  # API keys come from environment variables, never from this file:
+  #   CQ_API_KEY, CQ_API_SECRET

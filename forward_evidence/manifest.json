@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "created_at": "2026-08-13T12:20:20.635012+00:00",
+  "cutoff": "2026-08-12T23:00:00+00:00",
+  "strategy": "AdaptiveMultiFactor",
+  "strategy_sha256": "7af6eef1f4c33e9935657900f836829dd8cc6bb30348af27156e99ac3cf0a4e1",
+  "config_sha256": "c21ad7c744bff815f928f949e21b959dd533f73df6303b2f51e47aef48af1d4b",
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "BNBUSDT",
+    "XRPUSDT"
+  ],
+  "interval": "1h",
+  "status": "frozen",
+  "manifest_sha256": "ff7ba6c03f0189979fc3dca517b1cfa8579b54eb3ce7b3dd9d1c8874543ccac1"
+}

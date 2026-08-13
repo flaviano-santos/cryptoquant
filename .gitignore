@@ -1,0 +1,66 @@
+# ---- Secrets: never commit these -------------------------------------------
+.env
+.env.*
+*.pem
+*.key
+credentials*.json
+service-account*.json
+*-service-account.json
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+wallet*.json
+seed*.txt
+mnemonic*.txt
+
+# ---- Data and generated output ---------------------------------------------
+# Anchored with a leading slash so these only match at the repository root.
+# An unanchored "data/" would also ignore src/cryptoquant/data/, which is a
+# source package.
+/data/
+/reports/
+*.duckdb
+*.parquet
+*.zip
+live_state.json
+forward_snapshot.json
+
+# ---- Python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.installed.cfg
+
+# ---- Environments ----------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# ---- Tooling caches --------------------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# ---- Notebooks -------------------------------------------------------------
+.ipynb_checkpoints/
+
+# ---- Editors and OS --------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

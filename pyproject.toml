@@ -1,0 +1,139 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cryptoquant"
+version = "0.1.0"
+description = "A local, zero-cost research and trading stack for cryptocurrency markets."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "Flaviano da Silva Santos" }]
+keywords = ["quantitative-finance", "backtesting", "cryptocurrency", "machine-learning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "scipy>=1.11",
+    "pyarrow>=15.0",
+    "duckdb>=0.10",
+    "requests>=2.31",
+    "pyyaml>=6.0",
+    "scikit-learn>=1.4",
+    "lightgbm>=4.1",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+live = ["ccxt>=4.2"]
+research = ["statsmodels>=0.14", "jupyterlab>=4.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "types-requests",
+    "types-PyYAML",
+    "pre-commit>=3.7",
+]
+
+[project.urls]
+Homepage = "https://github.com/flavianosantos/cryptoquant"
+Repository = "https://github.com/flavianosantos/cryptoquant"
+Issues = "https://github.com/flavianosantos/cryptoquant/issues"
+
+[project.scripts]
+cryptoquant = "cryptoquant.cli:main"
+
+[tool.hatch.build.targets.wheel]
+artifacts = ["src/cryptoquant/default_config.yaml"]
+packages = ["src/cryptoquant"]
+
+# ---------------------------------------------------------------------------
+# Linting and formatting
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "N",    # pep8-naming
+    "D",    # pydocstyle
+    "SIM",  # flake8-simplify
+    "RUF",
+]
+ignore = [
+    "D105",  # magic methods do not need docstrings
+    "D107",  # __init__ is documented on the class
+    "E501",  # line length is handled by the formatter
+    "N803",  # allow X for a feature matrix, standard in ML code
+    "N806",  # allow X / M for matrices inside functions
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D101", "D102", "D103"]   # test names are the documentation
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# ---------------------------------------------------------------------------
+# Type checking
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+files = ["src/cryptoquant"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+no_implicit_optional = true
+check_untyped_defs = true
+# pandas-stubs is deliberately not installed. On a numeric codebase it turns
+# mypy into a fight with overload resolution rather than a bug finder, so
+# pandas is treated as untyped and mypy checks our own logic instead.
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-q --strict-markers --strict-config"
+markers = [
+    "slow: tests that take more than a few seconds",
+    "network: tests that require internet access (deselected by default)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:pkg_resources.*",
+]
+
+[tool.coverage.run]
+source = ["src/cryptoquant"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
