@@ -60,7 +60,10 @@ def ingest_recent_completed(cfg: Config, store: Store, limit: int = 1_000) -> pd
                     timeout=30,
                 )
                 candidate.raise_for_status()
+                rows = candidate.json()
             except requests.RequestException:
+                continue
+            if not isinstance(rows, list):
                 continue
             response = candidate
             sources[symbol] = base
@@ -68,7 +71,6 @@ def ingest_recent_completed(cfg: Config, store: Store, limit: int = 1_000) -> pd
         if response is None:
             print("Binance REST is region-blocked; using completed Vision archives only.")
             return None
-        rows = response.json()
         frame = pd.DataFrame(
             rows,
             columns=[
