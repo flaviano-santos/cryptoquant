@@ -57,7 +57,7 @@ def ingest_recent_completed(cfg: Config, store: Store, limit: int = 1_000) -> pd
                 candidate = requests.get(
                     f"{base}/klines",
                     params={"symbol": symbol, "interval": interval, "limit": limit},
-                    timeout=30,
+                    timeout=8,
                 )
                 candidate.raise_for_status()
                 rows = candidate.json()
@@ -119,7 +119,7 @@ def ingest_recent_completed(cfg: Config, store: Store, limit: int = 1_000) -> pd
             response = requests.get(
                 f"{base}/fundingRate",
                 params={"symbol": symbol, "startTime": start_ms, "limit": limit},
-                timeout=30,
+                timeout=8,
             )
             response.raise_for_status()
             funding = pd.DataFrame(response.json())
