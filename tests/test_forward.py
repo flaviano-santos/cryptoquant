@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from cryptoquant.config import Config
-from cryptoquant.forward import initialise, verify
+from cryptoquant.forward import ingest_recent_completed, initialise, verify
 
 
 @pytest.fixture
@@ -44,3 +44,50 @@ def test_ledger_tampering_is_detected(forward_dir):
     (forward_dir / "ledger.jsonl").write_text(json.dumps(entry) + "\n", encoding="utf8")
     with pytest.raises(RuntimeError, match="hash chain"):
         verify(forward_dir)
+
+
+def test_recent_collection_rejects_open_bars_and_synchronizes(monkeypatch, tmp_path):
+    cfg = Config(
+        raw={
+            "data": {
+                "root": str(tmp_path / "data"),
+                "market": "spot",
+                "symbols": ["BTCUSDT", "ETHUSDT"],
+                "interval": "1h",
+            }
+        },
+        path=tmp_path / "config.yaml",
+    )
+
+    class Response:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._rows
+
+    def row(open_time, close):
+        return [open_time, close, close, close, close, 1, open_time + 3_599_999, 1, 1, 1, 1, 0]
+
+    completed = 1_700_000_000_000
+    open_bar = 9_000_000_000_000
+    payloads = {
+        "BTCUSDT": [row(completed, 100), row(completed + 3_600_000, 101), row(open_bar, 999)],
+        "ETHUSDT": [row(completed, 50), row(open_bar, 999)],
+    }
+
+    def fake_get(_url, params, timeout):
+        assert timeout == 30
+        return Response(payloads[params["symbol"]])
+
+    monkeypatch.setattr("cryptoquant.forward.requests.get", fake_get)
+    from cryptoquant.data.store import Store
+
+    store = Store(cfg.data_root)
+    common_last = ingest_recent_completed(cfg, store)
+    assert common_last == pd.Timestamp(completed, unit="ms", tz="UTC")
+    assert len(store.read("klines", "BTCUSDT", "1h")) == 1
+    assert len(store.read("klines", "ETHUSDT", "1h")) == 1
