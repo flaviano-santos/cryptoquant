@@ -62,6 +62,7 @@ def test_recent_collection_rejects_open_bars_and_synchronizes(monkeypatch, tmp_p
     class Response:
         def __init__(self, rows):
             self._rows = rows
+            self.status_code = 200
 
         def raise_for_status(self):
             return None
