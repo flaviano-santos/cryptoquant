@@ -34,7 +34,10 @@ jobs:
         run: python -m cryptoquant.forward verify --config config.yaml --directory forward_evidence
 
       - name: Download completed bars and append evidence
-        run: python -m cryptoquant.forward update --config config.yaml --directory forward_evidence | tee forward_snapshot.json
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m cryptoquant.forward update --config config.yaml --directory forward_evidence | tee forward_snapshot.json
 
       - name: Verify evidence after collection
         run: python -m cryptoquant.forward verify --config config.yaml --directory forward_evidence
