@@ -53,14 +53,15 @@ def ingest_recent_completed(cfg: Config, store: Store, limit: int = 1_000) -> pd
     for symbol in symbols:
         response = None
         for base in bases:
-            candidate = requests.get(
-                f"{base}/klines",
-                params={"symbol": symbol, "interval": interval, "limit": limit},
-                timeout=30,
-            )
-            if candidate.status_code in (403, 451):
+            try:
+                candidate = requests.get(
+                    f"{base}/klines",
+                    params={"symbol": symbol, "interval": interval, "limit": limit},
+                    timeout=30,
+                )
+                candidate.raise_for_status()
+            except requests.RequestException:
                 continue
-            candidate.raise_for_status()
             response = candidate
             sources[symbol] = base
             break
