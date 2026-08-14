@@ -26,13 +26,13 @@ STRATEGY_FILE = ROOT / "src/cryptoquant/trading/strategies/adaptive_multifactor.
 CONFIG_FILE = ROOT / "config.yaml"
 
 _REST_BASES = {
-    "spot": "https://api.binance.com/api/v3",
-    "futures_um": "https://fapi.binance.com/fapi/v1",
-    "futures_cm": "https://dapi.binance.com/dapi/v1",
+    "spot": ("https://api.binance.com/api/v3",),
+    "futures_um": tuple(f"https://fapi{i or ''}.binance.com/fapi/v1" for i in range(4)),
+    "futures_cm": tuple(f"https://dapi{i or ''}.binance.com/dapi/v1" for i in range(4)),
 }
 
 
-def ingest_recent_completed(cfg: Config, store: Store, limit: int = 1_000) -> pd.Timestamp:
+def ingest_recent_completed(cfg: Config, store: Store, limit: int = 1_000) -> pd.Timestamp | None:
     """Merge a synchronized tail of completed public Binance bars into the store.
 
     Binance Vision remains the bulk source, but its daily archives can appear
@@ -43,19 +43,30 @@ def ingest_recent_completed(cfg: Config, store: Store, limit: int = 1_000) -> pd
     market = cfg.get("data.market", "futures_um")
     if market not in _REST_BASES:
         raise ValueError(f"recent collection is unsupported for market {market!r}")
-    base = _REST_BASES[market]
+    bases = _REST_BASES[market]
     interval = cfg.get("data.interval", "1h")
     symbols = list(cfg.get("data.symbols"))
     now_ms = int(datetime.now(UTC).timestamp() * 1_000)
     frames: dict[str, pd.DataFrame] = {}
+    sources: dict[str, str] = {}
 
     for symbol in symbols:
-        response = requests.get(
-            f"{base}/klines",
-            params={"symbol": symbol, "interval": interval, "limit": limit},
-            timeout=30,
-        )
-        response.raise_for_status()
+        response = None
+        for base in bases:
+            candidate = requests.get(
+                f"{base}/klines",
+                params={"symbol": symbol, "interval": interval, "limit": limit},
+                timeout=30,
+            )
+            if candidate.status_code in (403, 451):
+                continue
+            candidate.raise_for_status()
+            response = candidate
+            sources[symbol] = base
+            break
+        if response is None:
+            print("Binance REST is region-blocked; using completed Vision archives only.")
+            return None
         rows = response.json()
         frame = pd.DataFrame(
             rows,
@@ -101,6 +112,7 @@ def ingest_recent_completed(cfg: Config, store: Store, limit: int = 1_000) -> pd
     if market.startswith("futures"):
         start_ms = int((common_last - pd.Timedelta(days=45)).timestamp() * 1_000)
         for symbol in symbols:
+            base = sources[symbol]
             response = requests.get(
                 f"{base}/fundingRate",
                 params={"symbol": symbol, "startTime": start_ms, "limit": limit},
