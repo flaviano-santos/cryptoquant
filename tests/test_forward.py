@@ -81,7 +81,7 @@ def test_recent_collection_rejects_open_bars_and_synchronizes(monkeypatch, tmp_p
     }
 
     def fake_get(_url, params, timeout):
-        assert timeout == 30
+        assert timeout == 8
         return Response(payloads[params["symbol"]])
 
     monkeypatch.setattr("cryptoquant.forward.requests.get", fake_get)
