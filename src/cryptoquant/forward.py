@@ -14,15 +14,111 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
+import requests
 
 from .config import Config, load_config
-from .data.store import ingest
+from .data.store import Store, ingest
 from .pipeline import evaluate, load_feature_data
 from .trading.strategies import AdaptiveMultiFactor
 
 ROOT = Path(__file__).resolve().parents[2]
 STRATEGY_FILE = ROOT / "src/cryptoquant/trading/strategies/adaptive_multifactor.py"
 CONFIG_FILE = ROOT / "config.yaml"
+
+_REST_BASES = {
+    "spot": "https://api.binance.com/api/v3",
+    "futures_um": "https://fapi.binance.com/fapi/v1",
+    "futures_cm": "https://dapi.binance.com/dapi/v1",
+}
+
+
+def ingest_recent_completed(cfg: Config, store: Store, limit: int = 1_000) -> pd.Timestamp:
+    """Merge a synchronized tail of completed public Binance bars into the store.
+
+    Binance Vision remains the bulk source, but its daily archives can appear
+    late. The public REST endpoint fills that publication gap without an API
+    key. Every symbol is trimmed to the latest timestamp common to the entire
+    universe, and still-open candles are rejected before anything is written.
+    """
+    market = cfg.get("data.market", "futures_um")
+    if market not in _REST_BASES:
+        raise ValueError(f"recent collection is unsupported for market {market!r}")
+    base = _REST_BASES[market]
+    interval = cfg.get("data.interval", "1h")
+    symbols = list(cfg.get("data.symbols"))
+    now_ms = int(datetime.now(UTC).timestamp() * 1_000)
+    frames: dict[str, pd.DataFrame] = {}
+
+    for symbol in symbols:
+        response = requests.get(
+            f"{base}/klines",
+            params={"symbol": symbol, "interval": interval, "limit": limit},
+            timeout=30,
+        )
+        response.raise_for_status()
+        rows = response.json()
+        frame = pd.DataFrame(
+            rows,
+            columns=[
+                "open_time",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "close_time",
+                "quote_volume",
+                "trades",
+                "taker_buy_base",
+                "taker_buy_quote",
+                "ignore",
+            ],
+        )
+        frame = frame[pd.to_numeric(frame["close_time"]) < now_ms].copy()
+        if frame.empty:
+            raise RuntimeError(f"Binance returned no completed bars for {symbol}")
+        frame["ts"] = pd.to_datetime(frame["open_time"], unit="ms", utc=True)
+        for column in (
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "quote_volume",
+            "trades",
+            "taker_buy_base",
+            "taker_buy_quote",
+        ):
+            frame[column] = pd.to_numeric(frame[column], errors="coerce")
+        frame = frame.drop(columns=["open_time", "close_time", "ignore"])
+        frame.insert(0, "symbol", symbol)
+        frames[symbol] = frame.dropna(subset=["ts", "close"])
+
+    common_last = min(frame["ts"].max() for frame in frames.values())
+    for symbol, frame in frames.items():
+        store.write(frame[frame["ts"] <= common_last], "klines", symbol, interval)
+
+    if market.startswith("futures"):
+        start_ms = int((common_last - pd.Timedelta(days=45)).timestamp() * 1_000)
+        for symbol in symbols:
+            response = requests.get(
+                f"{base}/fundingRate",
+                params={"symbol": symbol, "startTime": start_ms, "limit": limit},
+                timeout=30,
+            )
+            response.raise_for_status()
+            funding = pd.DataFrame(response.json())
+            if funding.empty:
+                continue
+            funding = pd.DataFrame(
+                {
+                    "symbol": symbol,
+                    "ts": pd.to_datetime(funding["fundingTime"], unit="ms", utc=True),
+                    "funding_rate": pd.to_numeric(funding["fundingRate"], errors="coerce"),
+                }
+            ).dropna()
+            store.write(funding[funding["ts"] <= common_last], "funding", symbol)
+    return common_last
 
 
 def _sha256(path: Path) -> str:
@@ -126,7 +222,8 @@ def main() -> int:
         _, prices, _ = load_feature_data(cfg)
         value = initialise(cfg, directory, prices.dropna(how="all").index.max())
     elif args.action == "update":
-        ingest(cfg, with_funding=True, with_metrics=False)
+        store = ingest(cfg, with_funding=True, with_metrics=False)
+        ingest_recent_completed(cfg, store)
         value = append_snapshot(cfg, directory)
     else:
         value = verify(directory)
